@@ -1,0 +1,11 @@
+{
+  "OnestableDestinationBridgeProxyModule": {
+    "bridgedToken": "0x1C46eA59DCA8b835F9f97C14dd46660869e843A7",
+    "srcChainIds": [
+      97
+    ],
+    "srcTokenAddresses": [
+      "0xFEc38801643a72Ef01780F9C67dDa46cDf0F5AE4"
+    ]
+  }
+}

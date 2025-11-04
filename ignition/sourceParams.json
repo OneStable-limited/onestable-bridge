@@ -1,0 +1,7 @@
+{
+  "OnestableSourceBridgeProxyModule": {
+    "token": "0xFEc38801643a72Ef01780F9C67dDa46cDf0F5AE4",
+    "destChainId": 4545,
+    "destTokenAddress": "0x1C46eA59DCA8b835F9f97C14dd46660869e843A7"
+  }
+}
