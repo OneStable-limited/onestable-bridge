@@ -1,6 +1,6 @@
 {
-  "OnestableSourceBridgeProxyModule#OnestableSourceBridgeImplementation": "0xF8f19CFD398FB834E750A5DA05c89C44bccc3763",
-  "OnestableSourceBridgeProxyModule#OnestableSourceBridgeProxy": "0x7F6DAbFE58e9435BDAD445FAAD358e08eF6491Ae",
-  "OnestableSourceBridgeModule#OnestableSourceBridge": "0x7F6DAbFE58e9435BDAD445FAAD358e08eF6491Ae",
-  "OnestableSourceRelayerAdapterModule#OnestableSourceRelayerAdapter": "0xbf6750C99A9A9ae678b948497b3b8d99D6957A37"
+  "OnestableSourceBridgeProxyModule#OnestableSourceBridgeImplementation": "0xe59282bA8d0AB3Fc4493B1a29FA0DdF61a35CabF",
+  "OnestableSourceBridgeProxyModule#OnestableSourceBridgeProxy": "0xb298c29aaDFE068AB1e314D252e8f6Bef6A01fa8",
+  "OnestableSourceBridgeModule#OnestableSourceBridge": "0xb298c29aaDFE068AB1e314D252e8f6Bef6A01fa8",
+  "OnestableSourceRelayerAdapterModule#OnestableSourceRelayerAdapter": "0xEBe25526F20bfef75aD918C192F8CDc3439bc5C3"
 }

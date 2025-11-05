@@ -28,6 +28,7 @@ contract OnestableSourceBridge is
         address sender;
         address recipient;
         uint256 amount;
+        address token;
         uint256 destChainId;
         address destTokenAddress;
         uint256 maxConfirmationTimestamp;
@@ -75,6 +76,7 @@ contract OnestableSourceBridge is
         address indexed sender,
         address indexed recipient,
         uint256 amount,
+        address token,
         uint256 srcChainId,
         address srcTokenAddress
     );
@@ -101,6 +103,8 @@ contract OnestableSourceBridge is
     );
     error RevertNotAllowed(bytes32 lockId);
     error ConfirmLockNotAllowed(bytes32 lockId);
+    error DestinationChainNotAllowed(uint256 allowed, uint256 provided);
+    error DestinationTokenNotAllowed(address allowed, address provided);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -226,6 +230,7 @@ contract OnestableSourceBridge is
                     lockRecord.sender,
                     lockRecord.recipient,
                     lockRecord.amount,
+                    lockRecord.token,
                     lockRecord.destChainId,
                     lockRecord.destTokenAddress,
                     lockRecord.maxConfirmationTimestamp,
@@ -252,6 +257,7 @@ contract OnestableSourceBridge is
             msg.sender,
             recipient,
             amount,
+            address(token),
             destChainId,
             destTokenAddress,
             block.timestamp + maxConfirmationPeriod,
@@ -277,18 +283,30 @@ contract OnestableSourceBridge is
 
     /// @notice Confirm lock on source chain. Only callable by authorized message adapter.
     function confirmLock(
-        bytes32 lockId,
-        bytes32 receipt
+        bytes32 _lockId,
+        bytes32 _receipt,
+        uint256 _destChainId,
+        address _destTokenAddress
     ) external nonReentrant whenNotPaused onlyRole(MESSAGE_ADAPTER_ROLE) {
-        LockRecord memory lockRecord = lockRecords[lockId];
+        LockRecord memory lockRecord = lockRecords[_lockId];
         if (lockRecord.sender == address(0)) revert InvalidId();
-        if (isLockReverted[lockId]) revert ConfirmLockNotAllowed(lockId);
-        if (confirmedLockReceipts[lockId] != bytes32(0))
+        if (_destChainId != lockRecord.destChainId)
+            revert DestinationChainNotAllowed(
+                lockRecord.destChainId,
+                _destChainId
+            );
+        if (_destTokenAddress != lockRecord.destTokenAddress)
+            revert DestinationTokenNotAllowed(
+                lockRecord.destTokenAddress,
+                _destTokenAddress
+            );
+        if (isLockReverted[_lockId]) revert ConfirmLockNotAllowed(_lockId);
+        if (confirmedLockReceipts[_lockId] != bytes32(0))
             revert AlreadyProcessed();
 
-        confirmedLockReceipts[lockId] = receipt;
+        confirmedLockReceipts[_lockId] = _receipt;
 
-        emit LockConfirmed(lockId, receipt);
+        emit LockConfirmed(_lockId, _receipt);
     }
 
     /// @notice Revert tokens locked on source chain. Only callable by authorized message adapter.
@@ -357,6 +375,7 @@ contract OnestableSourceBridge is
             sender,
             recipient,
             amount,
+            address(token),
             srcChainId,
             srcTokenAddress
         );

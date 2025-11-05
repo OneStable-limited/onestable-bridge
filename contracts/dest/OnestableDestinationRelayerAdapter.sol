@@ -16,7 +16,12 @@ interface IOnestableDestinationBridge {
         uint256 maxConfirmationTimestamp
     ) external;
 
-    function confirmBurn(bytes32 burnId, bytes32 receipt) external;
+    function confirmBurn(
+        bytes32 burnId,
+        bytes32 receipt,
+        uint256 destChainId,
+        address destTokenAddress
+    ) external;
 
     function revertBurnedTokens(bytes32 burnId) external;
 }
@@ -80,16 +85,20 @@ contract OnestableDestinationRelayerAdapter is
     function executeConfirm(
         bytes32 burnId,
         bytes32 receipt,
+        uint256 destChainId,
+        address destTokenAddress,
         bytes calldata signature
     ) external nonReentrant whenNotPaused {
         // Compute message hash — deterministic and consistent with off-chain signer
-        bytes32 messageHash = keccak256(abi.encodePacked(burnId, receipt));
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(burnId, receipt, destChainId, destTokenAddress)
+        );
 
         // Verify signature
         verifySignature(messageHash, signature);
 
         // Forward to bridge (bridge handles replay internally)
-        bridge.confirmBurn(burnId, receipt);
+        bridge.confirmBurn(burnId, receipt, destChainId, destTokenAddress);
     }
 
     /// @notice Execute revert for the timeout request

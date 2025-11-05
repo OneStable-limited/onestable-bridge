@@ -16,7 +16,12 @@ interface IOnestableSourceBridge {
         uint256 maxConfirmationTimestamp
     ) external;
 
-    function confirmLock(bytes32 lockId, bytes32 receipt) external;
+    function confirmLock(
+        bytes32 _lockId,
+        bytes32 _receipt,
+        uint256 _destChainId,
+        address _destTokenAddress
+    ) external;
 
     function revertLockedTokens(bytes32 lockId) external;
 }
@@ -80,16 +85,20 @@ contract OnestableSourceRelayerAdapter is
     function executeConfirm(
         bytes32 lockId,
         bytes32 receipt,
+        uint256 destChainId,
+        address destTokenAddress,
         bytes calldata signature
     ) external nonReentrant whenNotPaused {
         // Compute message hash — deterministic and consistent with off-chain signer
-        bytes32 messageHash = keccak256(abi.encodePacked(lockId, receipt));
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(lockId, receipt, destChainId, destTokenAddress)
+        );
 
         // Verify signature
         verifySignature(messageHash, signature);
 
         // Forward to bridge (bridge handles replay internally)
-        bridge.confirmLock(lockId, receipt);
+        bridge.confirmLock(lockId, receipt, destChainId, destTokenAddress);
     }
 
     /// @notice Execute revert for the timeout request

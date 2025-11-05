@@ -37,8 +37,8 @@ const config: HardhatUserConfig = {
     apiKey: {
       bsc: process.env.ETHERSCAN_API_KEY || "",
       bscTestnet: process.env.ETHERSCAN_API_KEY || "",
-      mst: "abc",
-      mstTestnet: "abc",
+      mst: "empty",
+      mstTestnet: "empty",
     },
     customChains: [
       {

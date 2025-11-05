@@ -37,6 +37,7 @@ contract OnestableDestinationBridge is
         address sender;
         address recipient;
         uint256 amount;
+        address token;
         uint256 destChainId;
         address destTokenAddress;
         uint256 maxConfirmationTimestamp;
@@ -73,6 +74,7 @@ contract OnestableDestinationBridge is
         address indexed sender,
         address indexed recipient,
         uint256 amount,
+        address token,
         uint256 srcChainId,
         address srcTokenAddress
     );
@@ -99,7 +101,7 @@ contract OnestableDestinationBridge is
     error AlreadyProcessed();
     error InvalidChainId(string field);
     error InvalidId();
-    error DestinationChainNotAllowed(uint256 chainId);
+    error BurnForDestinationChainNotAllowed(uint256 chainId);
     error InsufficientMintedSupply(uint256 available, uint256 required);
     error MintNotAllowedFromSource(uint256 chainId);
     error MintNotAllowedFromSourceToken(
@@ -114,6 +116,8 @@ contract OnestableDestinationBridge is
     );
     error RevertNotAllowed(bytes32 burnId);
     error ConfirmBurnNotAllowed(bytes32 burnId);
+    error DestinationChainNotAllowed(uint256 allowed, uint256 provided);
+    error DestinationTokenNotAllowed(address allowed, address provided);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -225,6 +229,7 @@ contract OnestableDestinationBridge is
                     burnRecord.sender,
                     burnRecord.recipient,
                     burnRecord.amount,
+                    burnRecord.token,
                     burnRecord.destChainId,
                     burnRecord.destTokenAddress,
                     burnRecord.maxConfirmationTimestamp,
@@ -250,7 +255,7 @@ contract OnestableDestinationBridge is
 
         address destTokenAddress = allowedSourceTokens[destChainId];
         if (destTokenAddress == address(0))
-            revert DestinationChainNotAllowed(destChainId);
+            revert BurnForDestinationChainNotAllowed(destChainId);
 
         // transfer tokens into this contract to initiate burn (only minter allowed to burn)
         bridgedToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -265,6 +270,7 @@ contract OnestableDestinationBridge is
             msg.sender,
             recipient,
             amount,
+            address(bridgedToken),
             destChainId,
             destTokenAddress,
             block.timestamp + maxConfirmationPeriod,
@@ -288,10 +294,22 @@ contract OnestableDestinationBridge is
     /// @notice Confirm burn on destination chain. Only callable by authorized message adapter.
     function confirmBurn(
         bytes32 burnId,
-        bytes32 receipt
+        bytes32 receipt,
+        uint256 destChainId,
+        address destTokenAddress
     ) external nonReentrant whenNotPaused onlyRole(MESSAGE_ADAPTER_ROLE) {
         BurnRecord memory burnRecord = burnRecords[burnId];
         if (burnRecord.sender == address(0)) revert InvalidId();
+        if (destChainId != burnRecord.destChainId)
+            revert DestinationChainNotAllowed(
+                burnRecord.destChainId,
+                destChainId
+            );
+        if (destTokenAddress != burnRecord.destTokenAddress)
+            revert DestinationTokenNotAllowed(
+                burnRecord.destTokenAddress,
+                destTokenAddress
+            );
         if (isBurnReverted[burnId]) revert ConfirmBurnNotAllowed(burnId);
         if (confirmedBurnReceipts[burnId] != bytes32(0))
             revert AlreadyProcessed();
@@ -367,6 +385,7 @@ contract OnestableDestinationBridge is
             sender,
             recipient,
             amount,
+            address(bridgedToken),
             srcChainId,
             srcTokenAddress
         );
