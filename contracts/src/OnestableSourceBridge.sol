@@ -46,7 +46,7 @@ contract OnestableSourceBridge is
     /// @notice Track if a burn id has already been processed
     mapping(bytes32 => bool) public processedReleases;
 
-    /// @notice Mapping of lock id to lock record
+    /// @notice Mapping of lock id to unsettled lock record
     mapping(bytes32 => LockRecord) public lockRecords;
 
     /// @notice Maps lock id => destination chain confirmation tx hash
@@ -87,6 +87,7 @@ contract OnestableSourceBridge is
     error RescueNotAllowed(address token);
     error InvalidChainId(string field);
     error InvalidId();
+    error InvalidConfirmationPeriod(uint256 provided, uint256 min, uint256 max);
     error ReleaseNotAllowedFromSource(
         uint256 allowedChainId,
         uint256 srcChainId
@@ -171,9 +172,13 @@ contract OnestableSourceBridge is
     }
 
     /// @notice Admin can adjust confirmation period
+    /// @dev Event emission not needed
     function setMaxConfirmationPeriod(
         uint256 _maxPeriod
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_maxPeriod < 300 || _maxPeriod > 86400)
+            revert InvalidConfirmationPeriod(_maxPeriod, 300, 86400);
+
         maxConfirmationPeriod = _maxPeriod;
     }
 
@@ -266,7 +271,7 @@ contract OnestableSourceBridge is
         bytes32 lockId = _getLockId(lockRecord);
         lockRecords[lockId] = lockRecord;
 
-        // transfer tokens into this contract
+        // Transfer tokens to this contract
         token.safeTransferFrom(msg.sender, address(this), amount);
 
         emit TokensLocked(
@@ -306,6 +311,9 @@ contract OnestableSourceBridge is
 
         confirmedLockReceipts[_lockId] = _receipt;
 
+        // Delete a lock record
+        delete lockRecords[_lockId];
+
         emit LockConfirmed(_lockId, _receipt);
     }
 
@@ -327,8 +335,11 @@ contract OnestableSourceBridge is
         isLockReverted[lockId] = true;
         totalLockedSupply -= lockRecord.amount;
 
-        // transfer tokens into this contract
+        // Transfer tokens back to sender
         token.safeTransfer(lockRecord.sender, lockRecord.amount);
+
+        // Delete a lock record
+        delete lockRecords[lockId];
 
         emit RevertedLockedTokens(lockId, lockRecord.sender, lockRecord.amount);
     }
@@ -366,8 +377,7 @@ contract OnestableSourceBridge is
         processedReleases[burnId] = true;
         totalLockedSupply -= amount;
 
-        // transfer locked tokens to recipient
-        // using ERC20 transfer (bridge contract holds tokens)
+        // Transfer locked tokens to recipient
         token.safeTransfer(recipient, amount);
 
         emit TokensReleased(

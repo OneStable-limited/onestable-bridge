@@ -30,13 +30,31 @@ contract OnestableDestinationRelayerAdapter is
     OnestableRelayerAdapter,
     ReentrancyGuard
 {
+    bytes32 public constant MINT_TYPEHASH =
+        keccak256(
+            "Mint(bytes32 lockId,uint256 srcChainId,address srcTokenAddress,address sender,address recipient,uint256 amount,uint256 maxConfirmationTimestamp)"
+        );
+    bytes32 public constant CONFIRM_BURN_TYPEHASH =
+        keccak256(
+            "ConfirmBurn(bytes32 burnId,bytes32 receipt,uint256 destChainId,address destTokenAddress)"
+        );
+    bytes32 public constant REVERT_BURN_TYPEHASH =
+        keccak256("RevertBurn(bytes32 burnId)");
+
     IOnestableDestinationBridge public immutable bridge;
 
     constructor(
         address _owner,
         address _authorizedSigner,
         address _bridge
-    ) OnestableRelayerAdapter(_owner, _authorizedSigner) {
+    )
+        OnestableRelayerAdapter(
+            "OnestableDestinationRelayerAdapter",
+            "1",
+            _owner,
+            _authorizedSigner
+        )
+    {
         if (_bridge == address(0)) revert ZeroAddress("_bridge");
 
         bridge = IOnestableDestinationBridge(_bridge);
@@ -53,9 +71,10 @@ contract OnestableDestinationRelayerAdapter is
         uint256 maxConfirmationTimestamp,
         bytes calldata signature
     ) external nonReentrant whenNotPaused {
-        // Compute message hash — deterministic and consistent with off-chain signer
-        bytes32 messageHash = keccak256(
-            abi.encodePacked(
+        // Build EIP712 struct hash
+        bytes32 structHash = keccak256(
+            abi.encode(
+                MINT_TYPEHASH,
                 lockId,
                 srcChainId,
                 srcTokenAddress,
@@ -67,7 +86,7 @@ contract OnestableDestinationRelayerAdapter is
         );
 
         // Verify signature
-        verifySignature(messageHash, signature);
+        verifySignature(structHash, signature);
 
         // Forward to bridge (bridge handles replay internally)
         bridge.mintTokens(
@@ -89,13 +108,19 @@ contract OnestableDestinationRelayerAdapter is
         address destTokenAddress,
         bytes calldata signature
     ) external nonReentrant whenNotPaused {
-        // Compute message hash — deterministic and consistent with off-chain signer
-        bytes32 messageHash = keccak256(
-            abi.encodePacked(burnId, receipt, destChainId, destTokenAddress)
+        // Build EIP712 struct hash
+        bytes32 structHash = keccak256(
+            abi.encode(
+                CONFIRM_BURN_TYPEHASH,
+                burnId,
+                receipt,
+                destChainId,
+                destTokenAddress
+            )
         );
 
         // Verify signature
-        verifySignature(messageHash, signature);
+        verifySignature(structHash, signature);
 
         // Forward to bridge (bridge handles replay internally)
         bridge.confirmBurn(burnId, receipt, destChainId, destTokenAddress);
@@ -106,11 +131,13 @@ contract OnestableDestinationRelayerAdapter is
         bytes32 burnId,
         bytes calldata signature
     ) external nonReentrant whenNotPaused {
-        // Compute message hash — deterministic and consistent with off-chain signer
-        bytes32 messageHash = keccak256(abi.encodePacked(burnId));
+        // Build EIP712 struct hash
+        bytes32 structHash = keccak256(
+            abi.encode(REVERT_BURN_TYPEHASH, burnId)
+        );
 
         // Verify signature
-        verifySignature(messageHash, signature);
+        verifySignature(structHash, signature);
 
         // Forward to bridge (bridge handles replay internally)
         bridge.revertBurnedTokens(burnId);

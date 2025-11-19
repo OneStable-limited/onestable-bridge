@@ -53,7 +53,7 @@ contract OnestableDestinationBridge is
     /// @notice Track if a lock id has already been processed
     mapping(bytes32 => bool) public processedMints;
 
-    /// @notice Mapping of burn id to burn record
+    /// @notice Mapping of burn id to unsettled burn record
     mapping(bytes32 => BurnRecord) public burnRecords;
 
     /// @notice Maps burn id => source chain confirmation tx hash
@@ -101,6 +101,7 @@ contract OnestableDestinationBridge is
     error AlreadyProcessed();
     error InvalidChainId(string field);
     error InvalidId();
+    error InvalidConfirmationPeriod(uint256 provided, uint256 min, uint256 max);
     error BurnForDestinationChainNotAllowed(uint256 chainId);
     error InsufficientMintedSupply(uint256 available, uint256 required);
     error MintNotAllowedFromSource(uint256 chainId);
@@ -154,7 +155,7 @@ contract OnestableDestinationBridge is
         maxConfirmationPeriod = _maxConfirmationPeriod;
 
         for (uint256 i = 0; i < _srcChainIds.length; i++) {
-            setAllowedSourceTokens(_srcChainIds[i], _srcTokenAddresses[i]);
+            _setAllowedSourceTokens(_srcChainIds[i], _srcTokenAddresses[i]);
         }
     }
 
@@ -184,11 +185,10 @@ contract OnestableDestinationBridge is
         }
     }
 
-    /// @notice Grant or revoke source tokens (admin controlled)
-    function setAllowedSourceTokens(
+    function _setAllowedSourceTokens(
         uint256 chainId,
         address tokenAddress
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) internal {
         if (chainId == block.chainid) revert InvalidChainId("chainId");
 
         allowedSourceTokens[chainId] = tokenAddress;
@@ -196,10 +196,22 @@ contract OnestableDestinationBridge is
         emit AllowedSourceTokenUpdated(chainId, tokenAddress);
     }
 
+    /// @notice Grant or revoke source tokens (admin controlled)
+    function setAllowedSourceTokens(
+        uint256 chainId,
+        address tokenAddress
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setAllowedSourceTokens(chainId, tokenAddress);
+    }
+
     /// @notice Admin can adjust confirmation period
+    /// @dev Event emission not needed
     function setMaxConfirmationPeriod(
         uint256 _maxPeriod
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_maxPeriod < 300 || _maxPeriod > 86400)
+            revert InvalidConfirmationPeriod(_maxPeriod, 300, 86400);
+
         maxConfirmationPeriod = _maxPeriod;
     }
 
@@ -257,7 +269,7 @@ contract OnestableDestinationBridge is
         if (destTokenAddress == address(0))
             revert BurnForDestinationChainNotAllowed(destChainId);
 
-        // transfer tokens into this contract to initiate burn (only minter allowed to burn)
+        // transfer tokens to this contract to initiate burn (only minter allowed to burn)
         bridgedToken.safeTransferFrom(msg.sender, address(this), amount);
 
         // burn bridged tokens
@@ -316,6 +328,9 @@ contract OnestableDestinationBridge is
 
         confirmedBurnReceipts[burnId] = receipt;
 
+        // Delete a burn record
+        delete burnRecords[burnId];
+
         emit BurnConfirmed(burnId, receipt);
     }
 
@@ -341,6 +356,9 @@ contract OnestableDestinationBridge is
         bool minted = bridgedToken.mint(burnRecord.sender, burnRecord.amount);
         if (!minted)
             revert MintTokensFailed(burnRecord.sender, burnRecord.amount);
+
+        // Delete a burn record
+        delete burnRecords[burnId];
 
         emit RevertedBurnedTokens(burnId, burnRecord.sender, burnRecord.amount);
     }
