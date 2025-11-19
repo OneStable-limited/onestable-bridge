@@ -303,7 +303,18 @@ contract OnestableDestinationBridge is
         );
     }
 
-    /// @notice Confirm burn on destination chain. Only callable by authorized message adapter.
+    /// @notice Confirms a burn on the destination chain. Only callable by the authorized message adapter.
+    /// @dev IMPORTANT:
+    /// This function intentionally allows confirmations to be processed even after the burn record’s
+    /// nominal max confirmation time. This design decision preserves liveness during relayer delays,
+    /// messaging-layer congestion, or temporary network outages.
+    ///
+    /// As a result, the "maxConfirmationTimestamp" associated with a burn SHOULD NOT be interpreted as a strict
+    /// guarantee that confirmations will be rejected after max confirmation time.
+    ///
+    /// Integrators must NOT rely on the "maxConfirmationTimestamp" as a rejection condition for confirmBurn().
+    /// A delayed but valid receipt is still accepted as long as it matches the stored burn record
+    /// and the burn has not been reverted or previously processed.
     function confirmBurn(
         bytes32 burnId,
         bytes32 receipt,

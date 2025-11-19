@@ -286,7 +286,18 @@ contract OnestableSourceBridge is
         );
     }
 
-    /// @notice Confirm lock on source chain. Only callable by authorized message adapter.
+    /// @notice Confirms a lock on the source chain. Only callable by the authorized message adapter.
+    /// @dev IMPORTANT:
+    /// This function intentionally allows confirmations to be processed even after the lock’s
+    /// nominal max confirmation time. This design choice preserves liveness in scenarios where relayers,
+    /// messaging layers, or cross-chain networks experience delays or temporary outages.
+    ///
+    /// As a result, the "maxConfirmationTimestamp" associated with a lock SHOULD NOT be interpreted as a strict
+    /// guarantee that confirmations will be rejected after max confirmation time.
+    ///
+    /// Integrators must NOT rely on the maxConfirmationTimestamp as a rejection condition for confirmLock().
+    /// Lateness does NOT invalidate the confirmation, and a valid delayed receipt is still accepted
+    /// as long as it matches the stored lock record and has not been reverted or previously processed.
     function confirmLock(
         bytes32 _lockId,
         bytes32 _receipt,
