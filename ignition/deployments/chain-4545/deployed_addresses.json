@@ -1,6 +1,6 @@
 {
-  "OnestableDestinationBridgeProxyModule#OnestableDestinationBridgeImplementation": "0xb6d539573b422e8A7793F4D15671D04b81515191",
-  "OnestableDestinationBridgeProxyModule#OnestableDestinationBridgeProxy": "0xA24Ec959e990db24c9CD77ED76A1Ee4887d1b2a7",
-  "OnestableDestinationBridgeModule#OnestableDestinationBridge": "0xA24Ec959e990db24c9CD77ED76A1Ee4887d1b2a7",
-  "OnestableDestinationRelayerAdapterModule#OnestableDestinationRelayerAdapter": "0x8F2458D1c4e4AdD679477edF79DA49A8b918f594"
+  "OnestableDestinationBridgeProxyModule#OnestableDestinationBridgeImplementation": "0x8aaB6BC03B03DA332B116221bF408A4a1fA33757",
+  "OnestableDestinationBridgeProxyModule#OnestableDestinationBridgeProxy": "0x9806b77FAAe998dDD2B75A0f87D2B2567BafCd81",
+  "OnestableDestinationBridgeModule#OnestableDestinationBridge": "0x9806b77FAAe998dDD2B75A0f87D2B2567BafCd81",
+  "OnestableDestinationRelayerAdapterModule#OnestableDestinationRelayerAdapter": "0xAaD53D7B4c6526A80c88940a48B80697A40da7ef"
 }
