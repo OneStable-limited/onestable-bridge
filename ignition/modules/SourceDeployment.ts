@@ -6,6 +6,7 @@ const SourceDeploymentModule = buildModule("SourceDeploymentModule", (m) => {
   const { sourceBridge } = m.useModule(OnestableSourceBridgeModule);
   const { adapter } = m.useModule(OnestableSourceRelayerAdapterModule);
 
+  // Comment below line if deployer & bridge owner is not same & call method externally
   m.call(sourceBridge, "setMessageAdapter", [adapter, true]);
 
   return { sourceBridge, adapter };

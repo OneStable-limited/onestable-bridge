@@ -1,0 +1,6 @@
+{
+  "OnestableDestinationBridgeProxyModule#OnestableDestinationBridgeImplementation": "0x443d38527E7E00bC532F327339aFA96Af4dAa0FA",
+  "OnestableDestinationBridgeProxyModule#OnestableDestinationBridgeProxy": "0x683f0E1e2cB922Ad9C8F287809af9b9f9797D78d",
+  "OnestableDestinationBridgeModule#OnestableDestinationBridge": "0x683f0E1e2cB922Ad9C8F287809af9b9f9797D78d",
+  "OnestableDestinationRelayerAdapterModule#OnestableDestinationRelayerAdapter": "0xcb42F13D4091Da02C340370B3DF4e5499Ee81f25"
+}

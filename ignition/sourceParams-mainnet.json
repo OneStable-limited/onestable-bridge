@@ -1,0 +1,15 @@
+{
+  "OnestableSourceBridgeProxyModule": {
+    "defaultAdmin": "0x204F998BeDD972110300F440625684b9e691a88c",
+    "pauser": "0x204F998BeDD972110300F440625684b9e691a88c",
+    "upgrader": "0x204F998BeDD972110300F440625684b9e691a88c",
+    "token": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+    "destChainId": 4646,
+    "destTokenAddress": "0x349d9836dd52c25e61Ae745e3da0F8989De63745",
+    "maxConfirmationPeriod": 1800
+  },
+  "OnestableSourceRelayerAdapterModule": {
+    "owner": "0x204F998BeDD972110300F440625684b9e691a88c",
+    "authorizedSigner": "0x522516B9915F7AB1C29c517e0A54Eb504581f8e8"
+  }
+}
