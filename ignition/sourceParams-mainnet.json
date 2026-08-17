@@ -1,15 +1,15 @@
 {
   "OnestableSourceBridgeProxyModule": {
-    "defaultAdmin": "0x204F998BeDD972110300F440625684b9e691a88c",
-    "pauser": "0x204F998BeDD972110300F440625684b9e691a88c",
-    "upgrader": "0x204F998BeDD972110300F440625684b9e691a88c",
-    "token": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+    "defaultAdmin": "0x585ADA74a07EB27203B6644c13DEA113A78328dD",
+    "pauser": "0x585ADA74a07EB27203B6644c13DEA113A78328dD",
+    "upgrader": "0x585ADA74a07EB27203B6644c13DEA113A78328dD",
+    "token": "0xa614f803B6FD780986A42c78Ec9c7f77e6DeD13C",
     "destChainId": 4646,
-    "destTokenAddress": "0x349d9836dd52c25e61Ae745e3da0F8989De63745",
+    "destTokenAddress": "0x340d932fd0009A77E43d44AAF9379156d181d62D",
     "maxConfirmationPeriod": 1800
   },
   "OnestableSourceRelayerAdapterModule": {
-    "owner": "0x204F998BeDD972110300F440625684b9e691a88c",
-    "authorizedSigner": "0x522516B9915F7AB1C29c517e0A54Eb504581f8e8"
+    "owner": "0x585ADA74a07EB27203B6644c13DEA113A78328dD",
+    "authorizedSigner": "0x585ADA74a07EB27203B6644c13DEA113A78328dD"
   }
 }

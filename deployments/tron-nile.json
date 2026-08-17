@@ -1,0 +1,28 @@
+{
+  "network": "nile",
+  "deployer": "TTzdSKcgUzQxzMxtdivtyGxnyTrEdDvdHA",
+  "timestamp": "2026-06-02T04:08:15.893Z",
+  "contracts": {
+    "implementation": {
+      "address": "TBynYqzSsjyKBFkdwfBJfrxXJ6NcN2yU7S",
+      "hex": "41160C418D5e3DbD74f74C8eCD584A53AE558294f9"
+    },
+    "proxy": {
+      "address": "TBVPB3MYeGbauiruDL5QpWF9q2JF4zQGvQ",
+      "hex": "4110AD188C18094cF2656fB40f5C40CBBCC452691d"
+    },
+    "adapter": {
+      "address": "TTkGhfu9r1B3N3nVsQmXbZgU1XmyvsRbUU",
+      "hex": "41C2FfF2050366A99AC356579D75Ed2692a1f2D904"
+    }
+  },
+  "initArgs": [
+    "41ECa9bC828A3005B9a3b909f2cc5c2a54794DE05F",
+    91562037,
+    "41A402e19cbEAC809E1aed52ab71568e9462Bd5721",
+    1800,
+    "41C5B713eE1f425C1C0d3D7c7B5A7a9672701e086E",
+    "41C5B713eE1f425C1C0d3D7c7B5A7a9672701e086E",
+    "41C5B713eE1f425C1C0d3D7c7B5A7a9672701e086E"
+  ]
+}

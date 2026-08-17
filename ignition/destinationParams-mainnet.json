@@ -1,19 +1,19 @@
 {
   "OnestableDestinationBridgeProxyModule": {
-    "defaultAdmin": "0x204F998BeDD972110300F440625684b9e691a88c",
-    "pauser": "0x204F998BeDD972110300F440625684b9e691a88c",
-    "upgrader": "0x204F998BeDD972110300F440625684b9e691a88c",
-    "bridgedToken": "0x349d9836dd52c25e61Ae745e3da0F8989De63745",
+    "defaultAdmin": "0x585ADA74a07EB27203B6644c13DEA113A78328dD",
+    "pauser": "0x585ADA74a07EB27203B6644c13DEA113A78328dD",
+    "upgrader": "0x585ADA74a07EB27203B6644c13DEA113A78328dD",
+    "bridgedToken": "0x340d932fd0009A77E43d44AAF9379156d181d62D",
     "srcChainIds": [
-      56
+      728126428
     ],
     "srcTokenAddresses": [
-      "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
+      "0xa614f803B6FD780986A42c78Ec9c7f77e6DeD13C"
     ],
     "maxConfirmationPeriod": 1800
   },
   "OnestableDestinationRelayerAdapterModule": {
-    "owner": "0x204F998BeDD972110300F440625684b9e691a88c",
-    "authorizedSigner": "0x522516B9915F7AB1C29c517e0A54Eb504581f8e8"
+    "owner": "0x585ADA74a07EB27203B6644c13DEA113A78328dD",
+    "authorizedSigner": "0x585ADA74a07EB27203B6644c13DEA113A78328dD"
   }
 }

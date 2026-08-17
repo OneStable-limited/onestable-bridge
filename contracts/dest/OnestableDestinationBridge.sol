@@ -11,7 +11,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 interface IOnestableBridgedToken is IERC20 {
-    function mint(address _to, uint256 _amount) external returns (bool);
+    function mint(address _to, uint256 _amount) external;
 
     function burn(uint256 _amount) external;
 
@@ -109,7 +109,6 @@ contract OnestableDestinationBridge is
         address allowedTokenAddress,
         address srcTokenAddress
     );
-    error MintTokensFailed(address recipient, uint256 amount);
     error RequestTimeout(uint256 current, uint256 maxConfirmationTimestamp);
     error RevertBurnedTokensTooEarly(
         uint256 current,
@@ -321,6 +320,12 @@ contract OnestableDestinationBridge is
         uint256 destChainId,
         address destTokenAddress
     ) external nonReentrant whenNotPaused onlyRole(MESSAGE_ADAPTER_ROLE) {
+        // Check terminal states before loading the (potentially deleted) burn record
+        // so callers receive meaningful errors even after the record is gone.
+        if (isBurnReverted[burnId]) revert ConfirmBurnNotAllowed(burnId);
+        if (confirmedBurnReceipts[burnId] != bytes32(0))
+            revert AlreadyProcessed();
+
         BurnRecord memory burnRecord = burnRecords[burnId];
         if (burnRecord.sender == address(0)) revert InvalidId();
         if (destChainId != burnRecord.destChainId)
@@ -333,9 +338,6 @@ contract OnestableDestinationBridge is
                 burnRecord.destTokenAddress,
                 destTokenAddress
             );
-        if (isBurnReverted[burnId]) revert ConfirmBurnNotAllowed(burnId);
-        if (confirmedBurnReceipts[burnId] != bytes32(0))
-            revert AlreadyProcessed();
 
         confirmedBurnReceipts[burnId] = receipt;
 
@@ -349,6 +351,12 @@ contract OnestableDestinationBridge is
     function revertBurnedTokens(
         bytes32 burnId
     ) external nonReentrant whenNotPaused onlyRole(MESSAGE_ADAPTER_ROLE) {
+        // Check terminal states before loading the (potentially deleted) burn record
+        // so callers receive meaningful errors even after the record is gone.
+        if (confirmedBurnReceipts[burnId] != bytes32(0))
+            revert RevertNotAllowed(burnId);
+        if (isBurnReverted[burnId]) revert AlreadyProcessed();
+
         BurnRecord memory burnRecord = burnRecords[burnId];
         if (burnRecord.sender == address(0)) revert InvalidId();
         if (block.timestamp < burnRecord.maxConfirmationTimestamp)
@@ -356,17 +364,12 @@ contract OnestableDestinationBridge is
                 block.timestamp,
                 burnRecord.maxConfirmationTimestamp
             );
-        if (confirmedBurnReceipts[burnId] != bytes32(0))
-            revert RevertNotAllowed(burnId);
-        if (isBurnReverted[burnId]) revert AlreadyProcessed();
 
         isBurnReverted[burnId] = true;
         totalMintedSupply += burnRecord.amount;
 
         // mint bridged tokens
-        bool minted = bridgedToken.mint(burnRecord.sender, burnRecord.amount);
-        if (!minted)
-            revert MintTokensFailed(burnRecord.sender, burnRecord.amount);
+        bridgedToken.mint(burnRecord.sender, burnRecord.amount);
 
         // Delete a burn record
         delete burnRecords[burnId];
@@ -406,8 +409,7 @@ contract OnestableDestinationBridge is
         totalMintedSupply += amount;
 
         // mint bridged tokens
-        bool minted = bridgedToken.mint(recipient, amount);
-        if (!minted) revert MintTokensFailed(recipient, amount);
+        bridgedToken.mint(recipient, amount);
 
         emit TokensMinted(
             lockId,

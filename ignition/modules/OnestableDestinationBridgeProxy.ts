@@ -11,7 +11,7 @@ const OnestableDestinationBridgeProxyModule = buildModule(
     const srcTokenAddresses = m.getParameter("srcTokenAddresses");
     const maxConfirmationPeriod = m.getParameter(
       "maxConfirmationPeriod",
-      86400
+      86400,
     );
 
     const destinationBridge = m.contract("OnestableDestinationBridge", [], {
@@ -31,11 +31,11 @@ const OnestableDestinationBridgeProxyModule = buildModule(
           upgrader,
         ]),
       ],
-      { id: "OnestableDestinationBridgeProxy" }
+      { id: "OnestableDestinationBridgeProxy" },
     );
 
     return { proxy, implementation: destinationBridge };
-  }
+  },
 );
 
 export default OnestableDestinationBridgeProxyModule;

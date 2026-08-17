@@ -25,6 +25,7 @@
     "hardhat": "^2.26.5",
     "hardhat-gas-reporter": "^2.3.0",
     "solidity-coverage": "^0.8.16",
+    "tronweb": "^6.3.0",
     "ts-node": "^10.9.2",
     "typechain": "^8.3.2",
     "typescript": "^5.9.3"

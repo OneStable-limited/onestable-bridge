@@ -13,6 +13,7 @@ const config: HardhatUserConfig = {
         enabled: true,
         runs: 200,
       },
+      viaIR: true,
     },
   },
   networks: {
@@ -31,6 +32,12 @@ const config: HardhatUserConfig = {
     mstTestnet: {
       url: process.env.MST_TESTNET_RPC_URL,
       accounts: [process.env.MST_TESTNET_PRIVATE_KEY || "0x"],
+      ignition: {
+        maxFeePerGasLimit: 50_000_000_000n, // 50 gwei
+        maxFeePerGas: 20_000_000_000n, // 20 gwei
+        maxPriorityFeePerGas: 2_000_000_000n, // 2 gwei
+        gasPrice: 50_000_000_000n, // 50 gwei
+      },
     },
   },
   etherscan: {
@@ -50,7 +57,7 @@ const config: HardhatUserConfig = {
       },
       {
         network: "mstTestnet",
-        chainId: 4545,
+        chainId: 91562037,
         urls: {
           apiURL: "https://testnet.mstscan.com/api",
           browserURL: "https://testnet.mstscan.com/",
