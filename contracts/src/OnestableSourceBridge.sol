@@ -3,7 +3,6 @@
 pragma solidity ^0.8.27;
 
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -17,17 +16,21 @@ contract OnestableSourceBridge is
     AccessControlUpgradeable,
     UUPSUpgradeable
 {
-    using SafeERC20 for IERC20;
-
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant MESSAGE_ADAPTER_ROLE =
         keccak256("MESSAGE_ADAPTER_ROLE");
 
+    /// @notice Denominator for fee rate: 1 unit = 0.001%, so 1000 = 1%, 10000 = 10%
+    uint256 public constant FEE_DENOMINATOR = 100_000;
+    /// @notice Hard cap on the configurable fee rate: 10% = 10_000 units
+    uint256 public constant MAX_FEE_RATE = 10_000;
+
     struct LockRecord {
         address sender;
         address recipient;
-        uint256 amount;
+        uint256 amount; // net amount forwarded to destination for minting (after fee)
+        uint256 feeAmount; // fee held in collectedFees; refunded to sender if lock is reverted
         address token;
         uint256 destChainId;
         address destTokenAddress;
@@ -38,10 +41,19 @@ contract OnestableSourceBridge is
     uint256 private nonce; // sequential nonce for each lock operation
 
     IERC20 public token; // token locked on source chain
-    uint256 public totalLockedSupply; // total locked supply in this contract
+    uint256 public totalLockedSupply; // total net locked supply tracked by this contract
     uint256 public destChainId; // destination chain id
     address public destTokenAddress; // destination token address
     uint256 public maxConfirmationPeriod; // max time in seconds to must wait for relayer to confirm
+
+    /// @notice Fee rate where 1 unit = 0.001% (e.g. 500 = 0.5%, 1000 = 1%)
+    uint256 public feeRate;
+    /// @notice Per-operation fee cap in token units; 0 means no cap
+    uint256 public maxFeeAmount;
+    /// @notice Minimum gross amount (in token units) required for any bridge operation
+    uint256 public minBridgeAmount;
+    /// @notice Fees accumulated and available for admin withdrawal
+    uint256 public collectedFees;
 
     /// @notice Track if a burn id has already been processed
     mapping(bytes32 => bool) public processedReleases;
@@ -60,6 +72,7 @@ contract OnestableSourceBridge is
         address indexed sender,
         address indexed recipient,
         uint256 amount,
+        uint256 feeAmount,
         address token,
         uint256 maxConfirmationTimestamp,
         uint256 destChainId,
@@ -76,10 +89,16 @@ contract OnestableSourceBridge is
         address indexed sender,
         address indexed recipient,
         uint256 amount,
+        uint256 netAmount,
+        uint256 feeAmount,
         address token,
         uint256 srcChainId,
         address srcTokenAddress
     );
+    event FeeRateUpdated(uint256 newFeeRate);
+    event MaxFeeAmountUpdated(uint256 newMaxFeeAmount);
+    event MinBridgeAmountUpdated(uint256 newMinBridgeAmount);
+    event FeesWithdrawn(address indexed to, uint256 amount);
 
     error ZeroAddress(string field);
     error InvalidAmount();
@@ -106,6 +125,9 @@ contract OnestableSourceBridge is
     error ConfirmLockNotAllowed(bytes32 lockId);
     error DestinationChainNotAllowed(uint256 allowed, uint256 provided);
     error DestinationTokenNotAllowed(address allowed, address provided);
+    error AmountBelowMinimum(uint256 provided, uint256 minimum);
+    error InvalidFeeRate(uint256 provided, uint256 max);
+    error InsufficientFeeBalance(uint256 available, uint256 requested);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -143,6 +165,7 @@ contract OnestableSourceBridge is
         destChainId = _destChainId;
         destTokenAddress = _destTokenAddress;
         maxConfirmationPeriod = _maxConfirmationPeriod;
+        // feeRate, maxFeeAmount, minBridgeAmount default to 0 (no fees, no cap, no minimum)
     }
 
     function _authorizeUpgrade(
@@ -172,7 +195,6 @@ contract OnestableSourceBridge is
     }
 
     /// @notice Admin can adjust confirmation period
-    /// @dev Event emission not needed
     function setMaxConfirmationPeriod(
         uint256 _maxPeriod
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -182,15 +204,61 @@ contract OnestableSourceBridge is
         maxConfirmationPeriod = _maxPeriod;
     }
 
+    /// @notice Set the bridge fee rate. Supports 3 decimal places (0.001% precision).
+    /// @param _feeRate Fee in units where 1000 = 1.000%, max is 10000 (10.000%)
+    function setFeeRate(
+        uint256 _feeRate
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_feeRate > MAX_FEE_RATE)
+            revert InvalidFeeRate(_feeRate, MAX_FEE_RATE);
+        feeRate = _feeRate;
+        emit FeeRateUpdated(_feeRate);
+    }
+
+    /// @notice Set the per-operation fee cap in token units. Set to 0 to remove the cap.
+    function setMaxFeeAmount(
+        uint256 _maxFeeAmount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        maxFeeAmount = _maxFeeAmount;
+        emit MaxFeeAmountUpdated(_maxFeeAmount);
+    }
+
+    /// @notice Set the minimum gross token amount required to initiate any bridge operation.
+    function setMinBridgeAmount(
+        uint256 _minBridgeAmount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        minBridgeAmount = _minBridgeAmount;
+        emit MinBridgeAmountUpdated(_minBridgeAmount);
+    }
+
+    /// @notice Withdraw accumulated bridge fees to a recipient address.
+    function withdrawFees(
+        address to,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (to == address(0)) revert ZeroAddress("to");
+        if (amount == 0) revert InvalidAmount();
+        if (amount > collectedFees)
+            revert InsufficientFeeBalance(collectedFees, amount);
+
+        collectedFees -= amount;
+        token.transfer(to, amount);
+
+        emit FeesWithdrawn(to, amount);
+    }
+
+    /// @notice Returns true when the contract balance exactly covers locked supply plus collected fees
     function verifyParity() external view returns (bool) {
-        return token.balanceOf(address(this)) == totalLockedSupply;
+        return
+            token.balanceOf(address(this)) == totalLockedSupply + collectedFees;
     }
 
     function getExcessTokens() public view returns (uint256) {
         uint256 currentBalance = token.balanceOf(address(this));
+        uint256 accountedBalance = totalLockedSupply + collectedFees;
         return
-            currentBalance > totalLockedSupply
-                ? currentBalance - totalLockedSupply
+            currentBalance > accountedBalance
+                ? currentBalance - accountedBalance
                 : 0;
     }
 
@@ -204,7 +272,7 @@ contract OnestableSourceBridge is
         if (to == address(0)) revert ZeroAddress("to");
 
         uint256 excess = getExcessTokens();
-        if (excess > 0) token.safeTransfer(to, excess);
+        if (excess > 0) token.transfer(to, excess);
     }
 
     /**
@@ -223,7 +291,17 @@ contract OnestableSourceBridge is
         if (tokenContract == token)
             revert RescueNotAllowed(address(tokenContract));
 
-        tokenContract.safeTransfer(to, amount);
+        tokenContract.transfer(to, amount);
+    }
+
+    /// @dev Returns the fee for a given gross amount, respecting the cap.
+    function _calculateFee(uint256 amount) internal view returns (uint256) {
+        if (feeRate == 0) return 0;
+        uint256 fee = (amount * feeRate) / FEE_DENOMINATOR;
+        if (maxFeeAmount != 0 && fee > maxFeeAmount) {
+            fee = maxFeeAmount;
+        }
+        return fee;
     }
 
     function _getLockId(
@@ -244,24 +322,33 @@ contract OnestableSourceBridge is
             );
     }
 
-    /// @notice Lock tokens on source chain. Emits TokensLocked event for message adapter to forward.
+    /// @notice Lock tokens on source chain. A fee is deducted from `amount`; the net
+    ///         amount is what gets minted on the destination chain.
     /// @dev Caller must approve this bridge to spend `amount` on the bridged token.
-    /// @param recipient recipient address on destination chain
-    /// @param amount amount to lock (must be > 0)
+    /// @param recipient Recipient address on destination chain
+    /// @param amount Gross amount to lock (must be >= minBridgeAmount when set)
     function lockTokens(
         address recipient,
         uint256 amount
     ) external nonReentrant whenNotPaused {
         if (amount == 0) revert InvalidAmount();
         if (recipient == address(0)) revert ZeroAddress("recipient");
+        if (minBridgeAmount > 0 && amount < minBridgeAmount)
+            revert AmountBelowMinimum(amount, minBridgeAmount);
+
+        uint256 feeAmount = _calculateFee(amount);
+        uint256 netAmount = amount - feeAmount;
+        if (netAmount == 0) revert InvalidAmount();
 
         nonce += 1;
-        totalLockedSupply += amount;
+        totalLockedSupply += netAmount;
+        collectedFees += feeAmount;
 
         LockRecord memory lockRecord = LockRecord(
             msg.sender,
             recipient,
-            amount,
+            netAmount,
+            feeAmount,
             address(token),
             destChainId,
             destTokenAddress,
@@ -271,14 +358,14 @@ contract OnestableSourceBridge is
         bytes32 lockId = _getLockId(lockRecord);
         lockRecords[lockId] = lockRecord;
 
-        // Transfer tokens to this contract
-        token.safeTransferFrom(msg.sender, address(this), amount);
+        token.transferFrom(msg.sender, address(this), amount);
 
         emit TokensLocked(
             lockId,
             lockRecord.sender,
             lockRecord.recipient,
-            lockRecord.amount,
+            netAmount,
+            feeAmount,
             address(token),
             lockRecord.maxConfirmationTimestamp,
             destChainId,
@@ -288,7 +375,7 @@ contract OnestableSourceBridge is
 
     /// @notice Confirms a lock on the source chain. Only callable by the authorized message adapter.
     /// @dev IMPORTANT:
-    /// This function intentionally allows confirmations to be processed even after the lock’s
+    /// This function intentionally allows confirmations to be processed even after the lock's
     /// nominal max confirmation time. This design choice preserves liveness in scenarios where relayers,
     /// messaging layers, or cross-chain networks experience delays or temporary outages.
     ///
@@ -304,6 +391,12 @@ contract OnestableSourceBridge is
         uint256 _destChainId,
         address _destTokenAddress
     ) external nonReentrant whenNotPaused onlyRole(MESSAGE_ADAPTER_ROLE) {
+        // Check terminal states before loading the (potentially deleted) lock record
+        // so callers receive meaningful errors even after the record is gone.
+        if (isLockReverted[_lockId]) revert ConfirmLockNotAllowed(_lockId);
+        if (confirmedLockReceipts[_lockId] != bytes32(0))
+            revert AlreadyProcessed();
+
         LockRecord memory lockRecord = lockRecords[_lockId];
         if (lockRecord.sender == address(0)) revert InvalidId();
         if (_destChainId != lockRecord.destChainId)
@@ -316,22 +409,25 @@ contract OnestableSourceBridge is
                 lockRecord.destTokenAddress,
                 _destTokenAddress
             );
-        if (isLockReverted[_lockId]) revert ConfirmLockNotAllowed(_lockId);
-        if (confirmedLockReceipts[_lockId] != bytes32(0))
-            revert AlreadyProcessed();
 
         confirmedLockReceipts[_lockId] = _receipt;
 
-        // Delete a lock record
         delete lockRecords[_lockId];
 
         emit LockConfirmed(_lockId, _receipt);
     }
 
     /// @notice Revert tokens locked on source chain. Only callable by authorized message adapter.
+    ///         Both the net locked amount and the collected fee are refunded to the original sender.
     function revertLockedTokens(
         bytes32 lockId
     ) external nonReentrant whenNotPaused onlyRole(MESSAGE_ADAPTER_ROLE) {
+        // Check terminal states before loading the (potentially deleted) lock record
+        // so callers receive meaningful errors even after the record is gone.
+        if (confirmedLockReceipts[lockId] != bytes32(0))
+            revert RevertNotAllowed(lockId);
+        if (isLockReverted[lockId]) revert AlreadyProcessed();
+
         LockRecord memory lockRecord = lockRecords[lockId];
         if (lockRecord.sender == address(0)) revert InvalidId();
         if (block.timestamp < lockRecord.maxConfirmationTimestamp)
@@ -339,23 +435,22 @@ contract OnestableSourceBridge is
                 block.timestamp,
                 lockRecord.maxConfirmationTimestamp
             );
-        if (confirmedLockReceipts[lockId] != bytes32(0))
-            revert RevertNotAllowed(lockId);
-        if (isLockReverted[lockId]) revert AlreadyProcessed();
 
         isLockReverted[lockId] = true;
         totalLockedSupply -= lockRecord.amount;
+        collectedFees -= lockRecord.feeAmount;
 
-        // Transfer tokens back to sender
-        token.safeTransfer(lockRecord.sender, lockRecord.amount);
+        uint256 refundAmount = lockRecord.amount + lockRecord.feeAmount;
 
-        // Delete a lock record
         delete lockRecords[lockId];
 
-        emit RevertedLockedTokens(lockId, lockRecord.sender, lockRecord.amount);
+        token.transfer(lockRecord.sender, refundAmount);
+
+        emit RevertedLockedTokens(lockId, lockRecord.sender, refundAmount);
     }
 
     /// @notice Release tokens locked on source chain. Only callable by authorized message adapter.
+    ///         A fee is deducted from `amount`; the recipient receives the net amount.
     /// @dev Adapter will pass canonical payload including srcChainId and srcTxHash for replay-protection.
     function releaseTokens(
         bytes32 burnId,
@@ -372,6 +467,8 @@ contract OnestableSourceBridge is
         if (burnId == bytes32(0)) revert InvalidId();
         if (recipient == address(0)) revert ZeroAddress("recipient");
         if (amount == 0) revert InvalidAmount();
+        if (minBridgeAmount > 0 && amount < minBridgeAmount)
+            revert AmountBelowMinimum(amount, minBridgeAmount);
         if (maxConfirmationTimestamp < block.timestamp)
             revert RequestTimeout(block.timestamp, maxConfirmationTimestamp);
         if (processedReleases[burnId]) revert AlreadyProcessed();
@@ -382,20 +479,27 @@ contract OnestableSourceBridge is
                 destTokenAddress,
                 srcTokenAddress
             );
+
+        uint256 feeAmount = _calculateFee(amount);
+        uint256 netAmount = amount - feeAmount;
+        if (netAmount == 0) revert InvalidAmount();
+
         if (totalLockedSupply < amount)
             revert InsufficientLockedSupply(totalLockedSupply, amount);
 
         processedReleases[burnId] = true;
         totalLockedSupply -= amount;
+        collectedFees += feeAmount;
 
-        // Transfer locked tokens to recipient
-        token.safeTransfer(recipient, amount);
+        token.transfer(recipient, netAmount);
 
         emit TokensReleased(
             burnId,
             sender,
             recipient,
             amount,
+            netAmount,
+            feeAmount,
             address(token),
             srcChainId,
             srcTokenAddress

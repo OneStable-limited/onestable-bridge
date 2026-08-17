@@ -321,6 +321,12 @@ contract OnestableDestinationBridge is
         uint256 destChainId,
         address destTokenAddress
     ) external nonReentrant whenNotPaused onlyRole(MESSAGE_ADAPTER_ROLE) {
+        // Check terminal states before loading the (potentially deleted) burn record
+        // so callers receive meaningful errors even after the record is gone.
+        if (isBurnReverted[burnId]) revert ConfirmBurnNotAllowed(burnId);
+        if (confirmedBurnReceipts[burnId] != bytes32(0))
+            revert AlreadyProcessed();
+
         BurnRecord memory burnRecord = burnRecords[burnId];
         if (burnRecord.sender == address(0)) revert InvalidId();
         if (destChainId != burnRecord.destChainId)
@@ -333,9 +339,6 @@ contract OnestableDestinationBridge is
                 burnRecord.destTokenAddress,
                 destTokenAddress
             );
-        if (isBurnReverted[burnId]) revert ConfirmBurnNotAllowed(burnId);
-        if (confirmedBurnReceipts[burnId] != bytes32(0))
-            revert AlreadyProcessed();
 
         confirmedBurnReceipts[burnId] = receipt;
 
@@ -349,6 +352,12 @@ contract OnestableDestinationBridge is
     function revertBurnedTokens(
         bytes32 burnId
     ) external nonReentrant whenNotPaused onlyRole(MESSAGE_ADAPTER_ROLE) {
+        // Check terminal states before loading the (potentially deleted) burn record
+        // so callers receive meaningful errors even after the record is gone.
+        if (confirmedBurnReceipts[burnId] != bytes32(0))
+            revert RevertNotAllowed(burnId);
+        if (isBurnReverted[burnId]) revert AlreadyProcessed();
+
         BurnRecord memory burnRecord = burnRecords[burnId];
         if (burnRecord.sender == address(0)) revert InvalidId();
         if (block.timestamp < burnRecord.maxConfirmationTimestamp)
@@ -356,9 +365,6 @@ contract OnestableDestinationBridge is
                 block.timestamp,
                 burnRecord.maxConfirmationTimestamp
             );
-        if (confirmedBurnReceipts[burnId] != bytes32(0))
-            revert RevertNotAllowed(burnId);
-        if (isBurnReverted[burnId]) revert AlreadyProcessed();
 
         isBurnReverted[burnId] = true;
         totalMintedSupply += burnRecord.amount;
