@@ -50,10 +50,10 @@ const config: HardhatUserConfig = {
       },
       {
         network: "mstTestnet",
-        chainId: 4545,
+        chainId: 54635,
         urls: {
-          apiURL: "https://testnet.mstscan.com/api",
-          browserURL: "https://testnet.mstscan.com/",
+          apiURL: "https://coral.mstscan.com/api",
+          browserURL: "https://coral.mstscan.com/",
         },
       },
     ],

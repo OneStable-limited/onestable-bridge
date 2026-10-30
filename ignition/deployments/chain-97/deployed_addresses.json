@@ -1,6 +1,9 @@
 {
-  "OnestableSourceBridgeProxyModule#OnestableSourceBridgeImplementation": "0x42538d3Ba19FAd2E29b5e8B2c56743000c241E5E",
-  "OnestableSourceBridgeProxyModule#OnestableSourceBridgeProxy": "0x62877b375B4CCd1DE26AD723dF8E92e52C6705B1",
-  "OnestableSourceBridgeModule#OnestableSourceBridge": "0x62877b375B4CCd1DE26AD723dF8E92e52C6705B1",
-  "OnestableSourceRelayerAdapterModule#OnestableSourceRelayerAdapter": "0x99B5de2cd6ce7DdcBCA5902057E70846aF0CB03d"
+  "OnestableSourceBridgeProxyModule#OnestableSourceBridgeImplementation": "0x98c302c918A7eAe9f6f6FdA01DC4e6C79D5eF956",
+  "OnestableSourceBridgeProxyModule#OnestableSourceBridgeProxy": "0x4B279909B4F854E55E4622927Adc53f409093617",
+  "OnestableSourceBridgeModule#OnestableSourceBridge": "0x4B279909B4F854E55E4622927Adc53f409093617",
+  "OnestableSourceRelayerAdapterModule#OnestableSourceRelayerAdapter": "0x4995B94d6a973415Dae96d64111cAd62Ef22Ac46",
+  "SourceUpgradeV2Module#OnestableSourceBridgeV2": "0x4B279909B4F854E55E4622927Adc53f409093617",
+  "SourceUpgradeV2Module#OnestableSourceBridgeV2Implementation": "0x2A231ab605788fB0223550DaeFdA82C3A83857f4",
+  "SourceUpgradeV2Module#OnestableSourceRelayerAdapterV2": "0x29D3D143dA3656a6F8E621e07D39e44Cf9cCA20b"
 }
